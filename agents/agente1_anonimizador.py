@@ -79,6 +79,50 @@ def _generar_codigo_paciente(posicion: int) -> str:
     return f"PAC-{posicion:03d}"
 
 
+def _construir_registro(
+    cruda: dict[str, object], posicion: int
+) -> tuple[str, str, RegistroHistoriaClinica | None]:
+    """Devuelve (id_registro, codigo_paciente, registro). `registro` es
+    `None` si la fila cruda no alcanza a formar un `RegistroHistoriaClinica`
+    válido (columna estructural faltante/corrupta)."""
+    codigo_paciente = _generar_codigo_paciente(posicion)
+    id_registro = _a_texto(cruda["ID_Registro"]) or f"fila-{posicion}"
+
+    try:
+        registro = RegistroHistoriaClinica(
+            id_registro=id_registro,
+            nombre_completo=_a_texto(cruda["Nombre completo"]),
+            cedula=_a_texto(cruda["Cédula"]),
+            direccion=_a_texto(cruda["Dirección"]),
+            telefono=_a_texto(cruda["Teléfono"]),
+            fecha_consulta=_a_texto(cruda["Fecha de consulta"]),
+            nota_clinica=_a_texto(cruda["Nota clínica (texto libre)"]),
+        )
+    except Exception:
+        return id_registro, codigo_paciente, None
+
+    return id_registro, codigo_paciente, registro
+
+
+def cargar_registros_entrada(ruta_entrada: Path = config.ARCHIVO_ENTRADA) -> list[RegistroHistoriaClinica]:
+    """Carga y valida (sin anonimizar ni escribir nada) las filas crudas de
+    `Historias_Clinicas_Entrada` directamente desde el archivo de entrada
+    original.
+
+    La usa el orquestador para alimentar la verificación anti-fuga FINAL del
+    Agente 3 (sección 7, punto 4): esa verificación necesita los 4
+    identificadores para confirmar que no sobreviven en la salida, pero
+    tomarlos de aquí (y no del mapa de auditoría de `core.auditoria`)
+    significa que ni el Agente 2 ni el Agente 3 necesitan conocer jamás esa
+    ruta (sección 9)."""
+    registros: list[RegistroHistoriaClinica] = []
+    for posicion, cruda in enumerate(_leer_filas_crudas(ruta_entrada), start=1):
+        _, _, registro = _construir_registro(cruda, posicion)
+        if registro is not None:
+            registros.append(registro)
+    return registros
+
+
 def procesar_historias_clinicas(
     ruta_entrada: Path = config.ARCHIVO_ENTRADA,
     ruta_auditoria: Path = config.ARCHIVO_AUDITORIA,
@@ -100,20 +144,9 @@ def procesar_historias_clinicas(
     crudas = _leer_filas_crudas(ruta_entrada)
 
     for posicion, cruda in enumerate(crudas, start=1):
-        codigo_paciente = _generar_codigo_paciente(posicion)
-        id_registro = _a_texto(cruda["ID_Registro"]) or f"fila-{posicion}"
+        id_registro, codigo_paciente, registro = _construir_registro(cruda, posicion)
 
-        try:
-            registro = RegistroHistoriaClinica(
-                id_registro=id_registro,
-                nombre_completo=_a_texto(cruda["Nombre completo"]),
-                cedula=_a_texto(cruda["Cédula"]),
-                direccion=_a_texto(cruda["Dirección"]),
-                telefono=_a_texto(cruda["Teléfono"]),
-                fecha_consulta=_a_texto(cruda["Fecha de consulta"]),
-                nota_clinica=_a_texto(cruda["Nota clínica (texto libre)"]),
-            )
-        except Exception:
+        if registro is None:
             logger.error("codigo_paciente=%s: fila cruda inválida -> requiere_revision_manual", codigo_paciente)
             resultado.registros_con_error.append(
                 RegistroConError(id_registro=id_registro, codigo_paciente=codigo_paciente, motivo="fila_invalida")
