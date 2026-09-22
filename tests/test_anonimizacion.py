@@ -1,4 +1,5 @@
-"""Fase 1 — gate: anti-fuga en 12/12 registros reales (sección 10.2)."""
+"""Fase 1 — gate: anti-fuga en 15/15 registros reales (sección 10.2 y los 3
+registros sintéticos agregados en la Fase 3/4 como PAC-013..015)."""
 from __future__ import annotations
 
 import openpyxl
@@ -41,12 +42,12 @@ def registros_reales() -> list[RegistroHistoriaClinica]:
     return _cargar_registros_reales()
 
 
-def test_hay_doce_registros_reales(registros_reales):
-    assert len(registros_reales) == 12
+def test_hay_quince_registros_reales(registros_reales):
+    assert len(registros_reales) == 15
 
 
-def test_anonimizacion_elimina_los_4_identificadores_en_los_12_registros(registros_reales):
-    """Sección 10.2: ninguna de las 48 cadenas identificadoras (12 x 4)
+def test_anonimizacion_elimina_los_4_identificadores_en_todos_los_registros(registros_reales):
+    """Sección 10.2: ninguna de las cadenas identificadoras (N x 4)
     sobrevive en el texto_anonimizado correspondiente — probado
     programáticamente, no a ojo."""
     fallos = []
@@ -82,7 +83,7 @@ def test_anonimizacion_conserva_datos_clinicos_no_identificadores(registros_real
 
 
 def test_procesar_historias_clinicas_end_to_end(tmp_path):
-    """Gate de Fase 1: el pipeline del Agente 1 produce 12 payloads válidos y
+    """Gate de Fase 1: el pipeline del Agente 1 produce 15 payloads válidos y
     cero registros con error para el archivo de referencia."""
     ruta_auditoria = tmp_path / "historias_clinicas_con_codigo.xlsx"
 
@@ -91,9 +92,9 @@ def test_procesar_historias_clinicas_end_to_end(tmp_path):
         ruta_auditoria=ruta_auditoria,
     )
 
-    assert len(resultado.payloads) == 12
+    assert len(resultado.payloads) == 15
     assert resultado.registros_con_error == []
-    assert [p.codigo_paciente for p in resultado.payloads] == [f"PAC-{i:03d}" for i in range(1, 13)]
+    assert [p.codigo_paciente for p in resultado.payloads] == [f"PAC-{i:03d}" for i in range(1, 16)]
     assert ruta_auditoria.exists()
 
 
@@ -120,7 +121,7 @@ def test_auditoria_incluye_codigo_paciente_para_todas_las_filas(tmp_path):
     wb = openpyxl.load_workbook(ruta_auditoria)
     ws = wb["Historias_Clinicas_Entrada"]
     filas = list(ws.iter_rows(min_row=2, values_only=True))
-    assert len(filas) == 12
+    assert len(filas) == 15
     assert filas[0][-1] == "PAC-001"
     assert filas[0][1] == "Marcela Suárez Rincón"  # el mapa SÍ conserva identidad real
 
