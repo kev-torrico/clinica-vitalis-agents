@@ -11,6 +11,9 @@ from __future__ import annotations
 import re
 import unicodedata
 from dataclasses import dataclass, field
+from pathlib import Path
+
+import openpyxl
 
 from core.contratos import RegistroHistoriaClinica
 
@@ -83,5 +86,36 @@ def verificar_texto_anonimizado(fila: RegistroHistoriaClinica, texto_anonimizado
         componentes = _componentes_nombre_sueltos(fila)
         if any(_aparece_como_palabra(_normalizar(c), texto_normalizado) for c in componentes):
             categorias_filtradas.append("nombre_componente")
+
+    return ResultadoAntifuga(ok=not categorias_filtradas, categorias_filtradas=categorias_filtradas)
+
+
+def verificar_archivo_salida(
+    ruta_archivo: Path,
+    registros_entrada: list[RegistroHistoriaClinica],
+) -> ResultadoAntifuga:
+    """Verificación anti-fuga FINAL (sección 7, punto 4): relee el `.xlsx`
+    ya escrito en disco -- no los datos en memoria -- y confirma que
+    ninguna cadena de nombre, cédula, dirección o teléfono de NINGUNO de
+    los registros de entrada aparece en ninguna celda de ninguna hoja del
+    archivo de salida. Es la última línea de defensa antes de que el
+    archivo se considere entregable."""
+    wb = openpyxl.load_workbook(ruta_archivo, data_only=True)
+    celdas_texto = [
+        str(celda)
+        for hoja in wb.worksheets
+        for fila in hoja.iter_rows(values_only=True)
+        for celda in fila
+        if celda is not None
+    ]
+    texto_completo = "\n".join(celdas_texto)
+
+    categorias_filtradas: list[str] = []
+    for registro in registros_entrada:
+        resultado = verificar_texto_anonimizado(registro, texto_completo)
+        if not resultado.ok:
+            categorias_filtradas.extend(
+                f"{registro.id_registro}:{categoria}" for categoria in resultado.categorias_filtradas
+            )
 
     return ResultadoAntifuga(ok=not categorias_filtradas, categorias_filtradas=categorias_filtradas)
