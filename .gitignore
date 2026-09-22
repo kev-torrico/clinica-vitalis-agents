@@ -1,0 +1,16 @@
+# Mapa de auditoría (código <-> identidad real) — NUNCA a control de versiones
+data/internal/
+
+# Entregables generados (se regeneran corriendo el pipeline)
+data/output/
+
+# Entorno virtual
+.venv/
+__pycache__/
+*.pyc
+
+# Credenciales
+.env
+
+# Cache de pytest
+.pytest_cache/
