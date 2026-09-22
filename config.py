@@ -8,7 +8,13 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 BASE_DIR = Path(__file__).resolve().parent
+
+# Carga .env si existe (nunca se sube a git — ver .gitignore). No sobreescribe
+# variables ya presentes en el entorno real (ej. las de CI).
+load_dotenv(BASE_DIR / ".env")
 
 DATA_DIR = Path(os.environ.get("VITALIS_DATA_DIR", BASE_DIR / "data"))
 DATA_INPUT_DIR = DATA_DIR / "input"
